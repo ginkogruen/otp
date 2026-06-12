@@ -106,13 +106,27 @@ benefits to a Gleam application.
 - [gleam/otp/static_supervisor](https://hexdocs.pm/gleam_otp/gleam/otp/static_supervisor.html) documentation.
 - [gleam/otp/factory_supervisor](https://hexdocs.pm/gleam_otp/gleam/otp/factory_supervisor.html) documentation.
 
-## Limitations and known issues
-
-Actors do not yet support all OTP system messages, so some of the OTP debugging
-APIs may not be fully functional. These unsupported messages are discarded by
-actors. If you find that you have a need for one of the unimplemented system
-messages, open an issue and we will implement support for it.
+## Learning OTP
 
 This package has limited documentation for OTP itself, so attempting to use it
 without first studying the framework itself is likely to result in some
 confusion and sub-optimal code.
+
+## System messages
+
+OTP system messages are special messages used by some debugging APIs. Actors do
+not yet support all OTP system messages, so some of the more niche of these
+APIs may not be fully functional. If you find that you have a need for one of
+the unimplemented system messages, open an issue and we will implement support
+for it.
+
+## What about other parts of OTP?
+
+This package provides reliable typed bindings to a core subset of the Erlang
+OTP framework, enough for the majority of OTP code. If you wish to use other
+parts of the framework you can use the Erlang APIs directly, or you can use
+other packages that provide bindings to more functionality.
+
+Remember, OTP is one framework shared between all BEAM languages! There is no
+special Gleam version of OTP, and no reason to be limited to certain packages
+or APIs.

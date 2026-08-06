@@ -1,5 +1,9 @@
 # Changelog
 
+## v1.3.0 - 2026-08-06
+
+- The `gleam/otp/factory_supervisor` module gains the `count_children` function.
+
 ## v1.2.0 - 2025-10-03
 
 - The `gleam/otp/factory_supervisor` module has been added, for supervision of

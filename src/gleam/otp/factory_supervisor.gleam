@@ -115,9 +115,21 @@ const default_restart_strategy = supervision.Transient
 /// subject might be used instead of this type.
 ///
 pub opaque type Supervisor(child_argument, child_data) {
-  Supervisor(pid: Pid)
-  NamedSupervisor(name: process.Name(Message(child_argument, child_data)))
+  Supervisor(handle: SupervisorHandle)
 }
+
+/// An external type that is the union of the pid and the name of a supervisor,
+/// seeing as Erlang functions will accept either. In Gleam a subject would be
+/// used.
+type SupervisorHandle
+
+@external(erlang, "gleam_otp_external", "identity")
+fn pid_to_supervisor_handle(pid: Pid) -> SupervisorHandle
+
+@external(erlang, "gleam_otp_external", "identity")
+fn name_to_supervisor_handle(
+  name: process.Name(Message(child_argument, child_data)),
+) -> SupervisorHandle
 
 /// The message type of a factory supervisor. This message type is not used
 /// directly, but if you are using a name with a factory supervisor then this
@@ -139,7 +151,7 @@ pub type Message(child_argument, child_data)
 pub fn get_by_name(
   name: process.Name(Message(child_argument, child_data)),
 ) -> Supervisor(child_argument, child_data) {
-  NamedSupervisor(name)
+  Supervisor(name_to_supervisor_handle(name))
 }
 
 /// A builder for configuring and starting a supervisor. See each of the
@@ -309,7 +321,10 @@ pub fn start(
   }
 
   case start_result {
-    Ok(pid) -> Ok(actor.Started(pid:, data: Supervisor(pid)))
+    Ok(pid) -> {
+      let supervisor = Supervisor(pid_to_supervisor_handle(pid))
+      Ok(actor.Started(pid:, data: supervisor))
+    }
     Error(error) -> Error(convert_erlang_start_error(error))
   }
 }
@@ -400,11 +415,7 @@ pub fn start_child(
   supervisor: Supervisor(child_argument, child_data),
   argument: child_argument,
 ) -> actor.StartResult(child_data) {
-  let start = case supervisor {
-    NamedSupervisor(name:) -> erlang_start_child_name(name, _)
-    Supervisor(pid:) -> erlang_start_child_pid(pid, _)
-  }
-  case start([argument]) {
+  case erlang_start_child(supervisor.handle, [argument]) {
     result2.Ok(pid, data) -> Ok(actor.Started(pid, data))
     result2.Error(reason) -> Error(reason)
   }
@@ -419,35 +430,17 @@ pub fn start_child(
 /// to the supervisor still processing the termination of some of its children.
 ///
 pub fn count_children(factory: Supervisor(child_argument, child_data)) -> Int {
-  case factory {
-    Supervisor(pid:) -> erlang_count_children(pid)
-    NamedSupervisor(name:) -> erlang_count_children(name)
-  }
-  |> list.key_find(Active)
+  erlang_count_children(factory.handle)
+  |> list.key_find(atom.create("active"))
   |> result.unwrap(0)
 }
 
-type ErlangChildCountCategory {
-  Specs
-  Active
-  Supervisors
-  Workers
-}
-
 @external(erlang, "supervisor", "count_children")
-fn erlang_count_children(
-  supervisor: supervisor,
-) -> List(#(ErlangChildCountCategory, Int))
+fn erlang_count_children(supervisor: SupervisorHandle) -> List(#(Atom, Int))
 
 @external(erlang, "supervisor", "start_child")
-fn erlang_start_child_name(
-  supervisor: process.Name(Message(child_argument, child_data)),
-  argument: List(child_argument),
-) -> Result2(Pid, data, actor.StartError)
-
-@external(erlang, "supervisor", "start_child")
-fn erlang_start_child_pid(
-  supervisor: Pid,
+fn erlang_start_child(
+  supervisor: SupervisorHandle,
   argument: List(child_argument),
 ) -> Result2(Pid, data, actor.StartError)
 

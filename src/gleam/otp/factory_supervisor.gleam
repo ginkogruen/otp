@@ -95,10 +95,12 @@
 import gleam/dynamic.{type Dynamic}
 import gleam/erlang/atom.{type Atom}
 import gleam/erlang/process.{type Pid}
+import gleam/list
 import gleam/option
 import gleam/otp/actor
 import gleam/otp/internal/result2.{type Result2}
 import gleam/otp/supervision.{type ChildSpecification}
+import gleam/result
 
 const default_intensity = 2
 
@@ -407,6 +409,35 @@ pub fn start_child(
     result2.Error(reason) -> Error(reason)
   }
 }
+
+/// Returns the number of children under the supervisor.
+///
+/// This function runs the same speed regardless of how many children the
+/// supervisor has.
+///
+/// If the supervisor is heavily overloaded this number could be inaccurate due
+/// to the supervisor still processing the termination of some of its children.
+///
+pub fn count_children(factory: Supervisor(child_argument, child_data)) -> Int {
+  case factory {
+    Supervisor(pid:) -> erlang_count_children(pid)
+    NamedSupervisor(name:) -> erlang_count_children(name)
+  }
+  |> list.key_find(Active)
+  |> result.unwrap(0)
+}
+
+type ErlangChildCountCategory {
+  Specs
+  Active
+  Supervisors
+  Workers
+}
+
+@external(erlang, "supervisor", "count_children")
+fn erlang_count_children(
+  supervisor: supervisor,
+) -> List(#(ErlangChildCountCategory, Int))
 
 @external(erlang, "supervisor", "start_child")
 fn erlang_start_child_name(

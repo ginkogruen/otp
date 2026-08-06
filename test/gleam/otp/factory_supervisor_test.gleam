@@ -17,6 +17,12 @@ fn init_notifier_child(
   |> actor.start
 }
 
+fn idle_child(_argument: anything) -> actor.StartResult(Subject(Nil)) {
+  actor.new(Nil)
+  |> actor.on_message(fn(_msg, _state) { actor.stop() })
+  |> actor.start
+}
+
 pub fn transient_test() {
   let subject = process.new_subject()
   let builder = factory_supervisor.worker_child(init_notifier_child(subject, _))
@@ -259,4 +265,25 @@ pub fn named_test() {
   assert process.receive(subject, 10) == Error(Nil)
 
   process.send_exit(pid)
+}
+
+pub fn count_children_test() {
+  let assert Ok(actor.Started(data: factory, ..)) =
+    factory_supervisor.worker_child(idle_child)
+    |> factory_supervisor.start
+
+  assert factory_supervisor.count_children(factory) == 0
+
+  let assert Ok(child1) = factory_supervisor.start_child(factory, Nil)
+  let assert Ok(child2) = factory_supervisor.start_child(factory, Nil)
+
+  assert factory_supervisor.count_children(factory) == 2
+
+  process.send(child1.data, Nil)
+  process.sleep(25)
+  assert factory_supervisor.count_children(factory) == 1
+
+  process.send(child2.data, Nil)
+  process.sleep(25)
+  assert factory_supervisor.count_children(factory) == 0
 }
